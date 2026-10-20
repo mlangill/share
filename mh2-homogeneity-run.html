@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>MH2 Homogeneity Run</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Big+Shoulders+Display:wght@600;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one long lab-meeting scroll. A left "step rail" (SOP step number + reads remaining) runs beside each
+   step's prompt, Claude's work and tagged findings. Finding tags borrow the four Sanger trace colours. */
+:root {
+  --paper: #f2f5f6;
+  --panel: #ffffff;
+  --ink: #15222a;
+  --muted: #586a73;
+  --rule: #d3dde1;
+  --prompt: #1d4f9c;
+  --prompt-bg: #e6eef9;
+  --term-bg: #18232a;
+  --term-ink: #d9e6ea;
+  --term-dim: #8aa0a9;
+  --base-a: #1b8049;  /* A green: strength */
+  --base-c: #2563c4;  /* C blue: how it looks */
+  --base-g: #a66d00;  /* G amber: cost */
+  --base-t: #c0392b;  /* T red: correction */
+  --bar-orig: #a9b8bf;
+  --font-display: "Big Shoulders Display", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --step-0: 0.84rem;
+  --step-1: 1.06rem;
+  --step-2: 1.3rem;
+  --step-3: 1.8rem;
+  --step-4: 2.7rem;
+  --step-5: clamp(3rem, 8vw, 5.4rem);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #0f171b; --panel: #172228; --ink: #e2ecef; --muted: #93a6ae; --rule: #2a3a41;
+    --prompt: #8fb6f5; --prompt-bg: #1a2a40; --term-bg: #0a1013; --term-ink: #d9e6ea; --term-dim: #7f949c;
+    --base-a: #4cc283; --base-c: #6ea2f2; --base-g: #e0a636; --base-t: #f07563; --bar-orig: #4f626a;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #0f171b; --panel: #172228; --ink: #e2ecef; --muted: #93a6ae; --rule: #2a3a41;
+  --prompt: #8fb6f5; --prompt-bg: #1a2a40; --term-bg: #0a1013; --term-ink: #d9e6ea; --term-dim: #7f949c;
+  --base-a: #4cc283; --base-c: #6ea2f2; --base-g: #e0a636; --base-t: #f07563; --bar-orig: #4f626a;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--step-1);
+  line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1080px; margin: 0 auto; padding-block: 48px 96px; display: grid; gap: 88px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; line-height: 1.05; }
+h2 { font-family: var(--font-display); font-weight: 800; font-size: var(--step-4); text-transform: uppercase; letter-spacing: 0.01em; }
+h3 { font-size: var(--step-2); font-weight: 700; line-height: 1.25; }
+p { margin: 0; max-width: 68ch; }
+code, .mono { font-family: var(--font-mono); font-size: 0.86em; }
+p code, li code { background: var(--prompt-bg); padding: 0.05em 0.35em; border-radius: 3px; }
+a { color: var(--prompt); }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--prompt); outline-offset: 2px; }
+.eyebrow { font-family: var(--font-mono); font-size: var(--step-0); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.section-head { display: grid; gap: 12px; }
+.section-head p { color: var(--muted); }
+section { display: grid; gap: 32px; }
+
+/* hero */
+.hero { display: grid; gap: 28px; }
+.hero h1 { font-family: var(--font-display); font-weight: 800; font-size: var(--step-5); text-transform: uppercase; line-height: 0.92; letter-spacing: 0.005em; }
+.hero h1 span { color: var(--prompt); }
+.hero .lede { font-size: var(--step-2); line-height: 1.45; max-width: 60ch; }
+.trace-box { display: grid; gap: 8px; }
+#trace { width: 100%; height: 150px; display: block; }
+.trace-box figcaption { font-size: var(--step-0); color: var(--muted); max-width: 80ch; }
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+.fact { background: var(--paper); padding: 16px 18px; display: grid; gap: 4px; align-content: start; }
+.fact b { font-family: var(--font-display); font-weight: 800; font-size: var(--step-4); line-height: 1; font-variant-numeric: tabular-nums; }
+.fact span { font-size: var(--step-0); color: var(--muted); }
+
+.legend { display: flex; flex-wrap: wrap; gap: 10px 22px; font-size: var(--step-0); color: var(--muted); align-items: center; }
+.legend > span { display: inline-flex; gap: 8px; align-items: center; }
+
+/* base chips */
+.chip { display: inline-grid; place-items: center; width: 1.6em; height: 1.6em; flex: none; border-radius: 3px; font-family: var(--font-mono); font-weight: 600; font-size: 0.8rem; color: var(--paper); }
+.chip.a { background: var(--base-a); } .chip.c { background: var(--base-c); } .chip.g { background: var(--base-g); } .chip.t { background: var(--base-t); }
+
+/* prompts */
+.prompt { background: var(--prompt-bg); border-radius: 6px; padding: 14px 18px; display: grid; gap: 6px; max-width: 76ch; }
+.prompt .who { font-family: var(--font-mono); font-size: var(--step-0); color: var(--prompt); letter-spacing: 0.06em; }
+.prompt q { quotes: none; font-size: var(--step-1); font-style: italic; }
+.prompt-list { display: grid; gap: 12px; }
+
+/* terminal */
+.term { background: var(--term-bg); color: var(--term-ink); font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.55; border-radius: 6px; padding: 16px 18px; overflow-x: auto; white-space: pre; margin: 0; }
+.term .dim { color: var(--term-dim); }
+.term .ok { color: #6fd39b; }
+.term .warn { color: #f0b54a; }
+.term .bad { color: #ff8a7a; }
+
+/* how-it-works grid */
+.cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
+.cols > div { display: grid; gap: 12px; align-content: start; }
+ul.plain { margin: 0; padding-left: 1.1em; display: grid; gap: 6px; max-width: 70ch; }
+
+/* chart */
+.chart-wrap { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 20px; overflow-x: auto; display: grid; gap: 12px; }
+.chart-wrap svg { width: 100%; min-width: 560px; height: auto; display: block; }
+.chart-wrap svg text { fill: var(--ink); font-family: var(--font-body); }
+.chart-wrap svg .tick { fill: var(--muted); font-family: var(--font-mono); font-size: 11px; }
+.chart-wrap svg .val { font-family: var(--font-mono); }
+.chart-wrap svg .grid { stroke: var(--rule); stroke-width: 1; }
+.chart-key { display: flex; gap: 20px; flex-wrap: wrap; font-size: var(--step-0); color: var(--muted); }
+.chart-key i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+
+/* steps */
+.steps { display: grid; gap: 0; border-top: 1px solid var(--rule); }
+.step { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 32px; padding-block: 36px; border-bottom: 1px solid var(--rule); }
+.rail { display: grid; gap: 6px; align-content: start; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); align-self: start; }
+.rail .num { font-family: var(--font-display); font-weight: 800; font-size: 4.4rem; line-height: 0.85; color: var(--prompt); font-variant-numeric: tabular-nums; }
+.rail .name { font-family: var(--font-display); font-weight: 600; font-size: var(--step-2); text-transform: uppercase; letter-spacing: 0.02em; line-height: 1.1; }
+.rail .reads { font-family: var(--font-mono); font-size: var(--step-0); color: var(--muted); font-variant-numeric: tabular-nums; }
+.body { display: grid; gap: 18px; align-content: start; }
+.finds { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+.finds li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; }
+.finds li > div { display: grid; gap: 2px; max-width: 72ch; }
+.finds li strong { font-weight: 700; }
+
+/* scorecard */
+.score { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
+.score > div { display: grid; gap: 14px; align-content: start; border-top: 4px solid var(--base-a); padding-top: 16px; }
+.score > div.weak { border-top-color: var(--base-t); }
+.score ul { margin: 0; padding-left: 1.1em; display: grid; gap: 8px; }
+
+/* wiki fixes */
+.fixes { display: grid; gap: 0; border: 1px solid var(--rule); border-radius: 6px; background: var(--panel); }
+.fix { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 20px; padding: 16px 20px; border-bottom: 1px solid var(--rule); }
+.fix:last-child { border-bottom: 0; }
+.fix .where { font-family: var(--font-mono); font-size: var(--step-0); color: var(--muted); }
+.fix > div { display: grid; gap: 4px; }
+
+/* cost */
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+.table-wrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; }
+th, td { text-align: left; padding: 10px 16px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--font-mono); font-size: var(--step-0); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+td.n, th.n { text-align: right; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+tr.total td { font-weight: 700; }
+.cost-big { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+.cost-big .fact b { color: var(--base-g); }
+.note { font-size: var(--step-0); color: var(--muted); max-width: 80ch; }
+
+footer { font-size: var(--step-0); color: var(--muted); display: grid; gap: 6px; border-top: 1px solid var(--rule); padding-top: 20px; }
+
+@media (max-width: 760px) {
+  .facts, .cost-big { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cols, .score { grid-template-columns: 1fr; }
+  .step { grid-template-columns: 1fr; gap: 16px; }
+  .rail { position: static; grid-template-columns: auto 1fr; column-gap: 16px; align-items: end; }
+  .rail .num { font-size: 3.2rem; grid-row: span 2; }
+  .fix { grid-template-columns: 1fr; gap: 6px; }
+  .wrap { gap: 64px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero h1, .hero .lede { animation: rise 0.6s ease-out both; }
+  .hero .lede { animation-delay: 0.08s; }
+  @keyframes rise { from { transform: translateY(8px); } to { transform: none; } }
+}
+</style>
+<style>
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; } img { max-width: 100%; } [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">Langille Lab · Claude Code walkthrough · Oct 19–20, 2026</div>
+  <h1>Running MH2 on Homogeneity <span>with Claude Code</span></h1>
+  <p class="lede">I asked Claude Code to work through the Microbiome Helper 2 marker-gene SOP with me, one step at a time, on the IMMSA Homogeneity data (V4, 515F/806R, MiSeq 2×300). This page shows the prompts I typed, what the work looked like, what it caught, where it got things wrong, and what it would cost through the API.</p>
+  <figure class="trace-box" style="margin:0">
+    <canvas id="trace" aria-label="Four-colour trace of the 806R primer GGACTACNVGGGTWTCTAAT, with mixed peaks at degenerate positions and R2 cycles 3 to 7 shaded"></canvas>
+    <figcaption>806R primer drawn as a four-colour trace (A green, C blue, G amber, T red). Degenerate positions N, V and W show as mixed peaks. The shaded positions are R2 cycles 3–7, where the run produced many N calls. The original pipeline couldn't find the primer in those reads and discarded about 46% of read pairs. Claude found this, and it became the biggest gain of the run.</figcaption>
+  </figure>
+  <div class="facts">
+    <div class="fact"><b>95</b><span>samples with reads (96 sequenced; V11 had none)</span></div>
+    <div class="fact"><b>+8.3 M</b><span>read pairs recovered at primer trimming vs the original analysis</span></div>
+    <div class="fact"><b>~30</b><span>prompts from me; about a third were just “yes, go ahead”</span></div>
+    <div class="fact"><b>$10.63</b><span>what the session would have cost through the API on Opus 5.5</span></div>
+  </div>
+  <div class="legend" aria-label="Finding tags">
+    <span><i class="chip a">A</i> Strength or neat find</span>
+    <span><i class="chip t">T</i> Mistake or correction</span>
+    <span><i class="chip c">C</i> What working with it looks like</span>
+    <span><i class="chip g">G</i> Cost and resources</span>
+  </div>
+</header>
+
+<section aria-labelledby="h-how">
+  <div class="section-head">
+    <div class="eyebrow">Ground rules</div>
+    <h2 id="h-how">How we worked</h2>
+    <p>Claude Code runs in the terminal on kronos. It reads files, runs shell commands and edits files itself, and I approve or redirect as it goes. I set the rules in my first few prompts.</p>
+  </div>
+  <div class="prompt-list">
+    <div class="prompt"><span class="who">PROMPT</span><q>My research lab processes 16S data using Microbiome Helper (which we develop). The SOP for 16S data is here: […] I want to work through that SOP for some of the data here (maybe Homegeneity)? I would prefer if we work through it together where you tell me what files to look at (and you give me your suggestion) before moving to the next step. Does that sound good? Anything to discuss before we start?</q></div>
+    <div class="prompt"><span class="who">PROMPT, sent while a job was running</span><q>this is a shared server so can you check to make sure you don't overload the server when running?</q></div>
+    <div class="prompt"><span class="who">PROMPT</span><q>You can unzip and look at the numbers yourself, but I will copy them locally and view within browser. Lets use 12 threads (instead of 8). […] Also, I am going to want to show this workflow off to my lab, so can you keep track of things …</q></div>
+  </div>
+  <div class="cols">
+    <div>
+      <h3>What Claude did with that</h3>
+      <ul class="plain">
+        <li>Ran every heavy step with <code>nice -n 19</code> and 12 threads, and checked free memory first.</li>
+        <li>Stopped after each step, told me which <code>.qzv</code> files to open, and gave its own reading of the numbers before asking to continue.</li>
+        <li>Kept a running <code>WORKFLOW_LOG.md</code> with every command and decision, plus <code>PRESENTATION_NOTES.md</code>, which this page was built from.</li>
+        <li>Saved “memory” notes, so a new session knows the project, the 12-thread rule and the log location.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Claude Code features that came up</h3>
+      <ul class="plain">
+        <li><strong>Auto mode:</strong> commands run without a prompt, but risky ones still get flagged. One <code>rm -rf</code> was flagged (Step 8).</li>
+        <li><strong>Background tasks:</strong> long jobs (Deblur, SEPP) run detached, and Claude is notified when they finish.</li>
+        <li><strong>Monitors:</strong> a 30-second memory watch during SEPP is what exposed the thread overrun.</li>
+        <li><strong><code>!</code> prefix:</strong> <code>! ls</code> runs a command myself, inside the session.</li>
+        <li><strong>Compaction:</strong> the conversation filled the context window once and was summarized automatically, with no lost work.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="h-reads">
+  <div class="section-head">
+    <div class="eyebrow">The headline result</div>
+    <h2 id="h-reads">Where the reads went</h2>
+    <p>Read counts after each stage, summed over all samples, for this run and for the original DADA2 analysis that came with the data. Most of the gain came from two fixes Claude proposed: matching N calls in the primer as wildcards, and letting vsearch merge staggered pairs from read-through.</p>
+  </div>
+  <figure class="chart-wrap" style="margin:0">
+    <svg id="funnel" viewBox="0 0 760 330" role="img" aria-label="Paired bar chart of reads by stage"></svg>
+    <figcaption class="chart-key"><span><i style="background:var(--prompt)"></i>MH2 run (this session)</span><span><i style="background:var(--bar-orig)"></i>Original DADA2 analysis</span><span>Millions of read pairs, or merged reads after the merge step</span></figcaption>
+  </figure>
+  <p class="note">Most of the extra merged reads didn't survive denoising: the final count is +8%, not +53%. Claude's hypothesis, which we haven't tested, is that the extra pairs rescued with <code>maxdiffs 20</code> are noisier, so Deblur throws more of them out. After the SOP filters, the final table has 660 ASVs and 11.53 M reads across 89 samples.</p>
+</section>
+
+<section aria-labelledby="h-steps">
+  <div class="section-head">
+    <div class="eyebrow">Step by step</div>
+    <h2 id="h-steps">The run, in SOP order</h2>
+    <p>The left column gives the step and the read count at that point. Each finding has one of the four tags.</p>
+  </div>
+
+  <div class="steps">
+
+    <article class="step">
+      <div class="rail"><div class="num">0</div><div class="name">Explore the download</div><div class="reads">20.74 M raw pairs</div></div>
+      <div class="body">
+        <div class="prompt"><span class="who">PROMPT</span><q>I downloaded some data from the immsa project. I unzipped the main folder already. Describe what is in it.</q></div>
+        <ul class="finds">
+          <li><i class="chip a">A</i><div><strong>Found 3 truncated FASTQs in the Stability set.</strong> While counting reads, gzip reported damaged files (OT16-20-1 R1/R2, OT16-20-2 R1). Claude checked the sizes inside the zip and showed they were already truncated when the zip was made, so unzipping hadn't caused it.</div></li>
+          <li><i class="chip a">A</i><div><strong>Checked whether the O and V files were duplicates</strong> (md5 sums, Illumina indexes, metadata). They aren't: they're two donors, Omnivore and Vegetarian.</div></li>
+          <li><i class="chip t">T</i><div><strong>Said there were no controls.</strong> Going by the filenames, Claude said Homogeneity had no pools, mock or negatives. The metadata showed all three. Lesson: read the metadata before interpreting anything.</div></li>
+          <li><i class="chip t">T</i><div><strong>Used 16 parallel jobs</strong> before I said it was a shared server. After that, everything ran with <code>nice -n 19</code> and 12 threads.</div></li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="step">
+      <div class="rail"><div class="num">1</div><div class="name">FastQC + MultiQC</div><div class="reads">20.74 M raw pairs</div></div>
+      <div class="body">
+        <pre class="term"><span class="dim">$</span> multiqc fastqc_out/
+<span class="bad">bash: /usr/bin/multiqc: /usr/bin/python: bad interpreter: No such file or directory</span>
+<span class="dim"># Claude read the script's first line, then installed MultiQC in my venv. No sudo, no system changes.</span>
+<span class="dim">$</span> ~/venvs/immsa/bin/pip install multiqc <span class="ok">✓</span></pre>
+        <ul class="finds">
+          <li><i class="chip a">A</i><div><strong>Fixed a broken system tool without being asked.</strong> The system <code>multiqc</code> pointed at a Python that no longer exists. Claude diagnosed it from the shebang line and installed a working copy locally.</div></li>
+          <li><i class="chip a">A</i><div><strong>Spotted the N artifact.</strong> R2 has heavy N calls at cycles 3–7 (76% of reads at cycle 4), all inside the 806R primer. Later this turned out to explain why the original analysis lost about 46% of reads.</div></li>
+        </ul>
+        <div class="prompt"><span class="who">PROMPT</span><q>There are some samples with no reads and some of those show a median length of 34bp and others have longer reads. How is that they have a median length if there are no reads (or maybe there are just a few)? Also, anything obvious about these samples with low read depths (i.e. negative controls)?</q></div>
+        <ul class="finds">
+          <li><i class="chip a">A</i><div><strong>Explained the 34 bp median.</strong> Most reads in the negatives are 35-N placeholder reads, which the MiSeq writes when on-instrument adapter trimming leaves less than 35 bp (adapter or primer dimers). O22 is 80% placeholders and V22 is 87%.</div></li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="step">
+      <div class="rail"><div class="num">3</div><div class="name">Primer trimming</div><div class="reads">19.94 M pairs kept<br>original: 11.60 M</div></div>
+      <div class="body">
+        <pre class="term"><span class="dim">$</span> nice -n 19 qiime cutadapt trim-paired --p-cores 12 \
+    --p-front-f GTGYCAGCMGCCGCGGTAA --p-front-r GGACTACNVGGGTWTCTAAT \
+    --p-adapter-f ATTAGAWACCCBNGTAGTCC --p-adapter-r TTACCGCGGCKGCTGRCAC \
+    <span class="warn">--p-match-read-wildcards</span> --p-times 2 --p-discard-untrimmed --p-no-indels ...
+<span class="ok">Pairs kept: 97.3% (median per sample)   original analysis: 56.4%</span></pre>
+        <ul class="finds">
+          <li><i class="chip a">A</i><div><strong>Root-caused the original 46% loss.</strong> cutadapt counts an N in a read as a mismatch. Up to 4 Ns in the 20-nt primer meant the primer wasn't found, the read stayed untrimmed, and then <code>--max-n=0</code> discarded it. One flag, <code>--match-read-wildcards</code>, recovered 8.3 M pairs.</div></li>
+          <li><i class="chip a">A</i><div><strong>Caught read-through, which the SOP doesn't handle.</strong> With 2×300 reads on a ~253 bp insert, about 70% of R1 reads run into the opposite primer. Claude added the reverse-complement primers as 3′ adapters, and predicted that vsearch would need <code>allowmergestagger</code>.</div></li>
+          <li><i class="chip a">A</i><div><strong>Checked its own trimming</strong> by parsing all 95 cutadapt reports: at most 0.03% of kept pairs could still carry a 5′ primer.</div></li>
+        </ul>
+        <div class="prompt"><span class="who">PROMPT</span><q>Why do tmp on disk? Isn't it faster having it on RAM?</q></div>
+        <ul class="finds">
+          <li><i class="chip t">T</i><div><strong>Overstated the advice about <code>/tmp</code>.</strong> Claude had suggested moving QIIME 2's temp files from RAM-backed <code>/tmp</code> to disk. When I pushed back, it agreed: these steps are CPU-bound, and <code>/home</code> is on NFS, which would be slower. My judgment overruled the model here.</div></li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="step">
+      <div class="rail"><div class="num">4</div><div class="name">Merge pairs</div><div class="reads">16.51 M merged<br>original: 10.81 M</div></div>
+      <div class="body">
+        <div class="prompt"><span class="who">PROMPT</span><q>lets test your tweaks</q></div>
+        <ul class="finds">
+          <li><i class="chip a">A</i><div><strong>Ran a quick parameter sweep</strong> instead of repeating the 30-minute full merge. Claude pulled 4 samples out of the QIIME 2 artifact and ran vsearch directly with 5 settings in about 2 minutes. Raising <code>maxdiffs</code> from 10 to 20 lifted merging from about 70% to about 83%.</div></li>
+          <li><i class="chip t">T</i><div><strong>Wrong hypothesis, dropped after testing.</strong> Claude expected <code>truncqual</code> to help. It made merging worse (64–67%) because it shortens R2, so pairs no longer share enough overlap to align.</div></li>
+          <li><i class="chip c">C</i><div><strong>Shared-server reality.</strong> Claude Code itself stopped a background job when free RAM dropped to 3 GB, mostly because of other users' jobs. Claude reported what had stopped, checked that the merge output was already saved, and didn't restart it until I said to.</div></li>
+        </ul>
+        <div class="prompt"><span class="who">PROMPT</span><q>btw, when I look at memory and processes I can't really tell why so much memory is being used. Do you have a command you would recommend from the command line to check per usage memory?</q></div>
+        <pre class="term"><span class="dim">$</span> ps -eo user,rss --no-headers | awk '{m[$1]+=$2} END{for(u in m) printf "%-12s %6.1f GB\n", u, m[u]/1048576}' | sort -k2 -rn | head</pre>
+      </div>
+    </article>
+
+    <article class="step">
+      <div class="rail"><div class="num">5</div><div class="name">Quality filter</div><div class="reads">16.51 M (99.97%)</div></div>
+      <div class="body">
+        <ul class="finds">
+          <li><i class="chip t">T</i><div><strong>Guessed a file format and hung a command.</strong> Claude assumed QIIME 2's stats file was <code>.tsv</code>, but it was <code>stats.csv</code>, so <code>head</code> got no file and waited forever on input. Claude found the cause and stopped it. Small, but typical: check the file format before guessing.</div></li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="step">
+      <div class="rail"><div class="num">6</div><div class="name">Deblur</div><div class="reads">11.59 M<br>original DADA2: 10.70 M</div></div>
+      <div class="body">
+        <pre class="term"><span class="dim">$</span> qiime feature-table summarize ... --o-visualization deblur_table_summary.qzv
+<span class="bad">Error: No such option: --o-visualization</span>
+<span class="dim"># QIIME 2 2026.4 changed this: --o-summary, plus two new required outputs</span>
+<span class="dim">$</span> qiime feature-table summarize ... --o-summary ... --o-feature-frequencies ... --o-sample-frequencies ... <span class="ok">✓</span></pre>
+        <ul class="finds">
+          <li><i class="chip a">A</i><div><strong>Found a breaking change in the SOP.</strong> The MH2 command fails in 2026.4. Claude read the error, ran the new form, and flagged that the wiki needs updating.</div></li>
+          <li><i class="chip t">T</i><div><strong>Called the Zymo controls a “mock community”.</strong> They have hundreds of ASVs each and gut genera (Bacteroides, Blautia, Faecalibacterium), so they're a fecal reference standard. Claude noticed the mismatch itself and corrected the log.</div></li>
+          <li><i class="chip t">T</i><div><strong>Overestimated the runtime:</strong> it predicted 1–2 h, and Deblur took 20 min.</div></li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="step">
+      <div class="rail"><div class="num">7</div><div class="name">Taxonomy</div><div class="reads">8,227 ASVs</div></div>
+      <div class="body">
+        <pre class="term"><span class="bad">ValueError: The scikit-learn version (1.4.2) used to generate this artifact does not
+match the current version of scikit-learn installed (1.7.1). Please retrain your classifier...</span></pre>
+        <div class="prompt"><span class="who">PROMPT</span><q>Lets go with option 1.</q></div>
+        <ul class="finds">
+          <li><i class="chip a">A</i><div><strong>Tested the lab's shared classifiers before using them.</strong> None of them load in QIIME 2 2026.4.</div></li>
+          <li><i class="chip t">T</i><div><strong>Offered a download that doesn't exist.</strong> Claude's “option 1” assumed QIIME 2 still hosts Greengenes2 classifiers, but as of 2026.4 it doesn't. Its first guessed URLs returned 404.</div></li>
+          <li><i class="chip a">A</i><div><strong>Recovered by reading the source.</strong> It read QIIME 2's data-resources page, followed it to SILVA's own site, and found a SILVA 144 classifier built with <em>exactly</em> our 515F/806R primers and scikit-learn 1.7.1. It verified the md5 checksum before use. Classification took 46 s.</div></li>
+          <li><i class="chip a">A</i><div><strong>Cross-checked the result without being asked.</strong> The top genera matched the original DADA2 summary to within about 1% (Omnivore: Collinsella 17.5% vs 18.8%). It also flagged that SILVA 144 leaves Bifidobacterium at family level, where SILVA 138 assigned the genus.</div></li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="step">
+      <div class="rail"><div class="num">8</div><div class="name">Filtering</div><div class="reads">660 ASVs · 89 samples<br>11.53 M reads</div></div>
+      <div class="body">
+        <pre class="term"><span class="warn">⚠ Permission prompt:</span> rm -rf $S/$t
+<span class="dim">  If the variable is empty this could delete files from the filesystem root.</span>
+<span class="dim">  → I rejected the call and asked about it. Claude switched to:</span>
+rm -rf "${S:?}/${t:?}"   <span class="dim"># aborts if either variable is empty</span></pre>
+        <div class="prompt"><span class="who">PROMPT</span><q>I got a warning about an rm command where if the variable was empty could delete many files. […] Was that files in tmp you were trying to remove?</q></div>
+        <ul class="finds">
+          <li><i class="chip c">C</i><div><strong>The safety net worked.</strong> The target was only Claude's own scratch folders, but the pattern was unsafe. The permission check plus a person reading it caught a real, if unlikely, risk.</div></li>
+          <li><i class="chip a">A</i><div><strong>Followed the actual SOP, not memory.</strong> Claude had proposed removing unclassified ASVs. When it fetched the SOP text, the SOP says not to do that by default, so it followed the SOP and told me.</div></li>
+        </ul>
+        <div class="prompt"><span class="who">PROMPT</span><q>Why would I pick 10,000? Wouldn't it make more sense to go with 46,646, since that will keep more sequences in all the samples that are kept and still remove the same samples as the 10k cutoff?</q></div>
+        <ul class="finds">
+          <li><i class="chip c">C</i><div><strong>A good teaching moment.</strong> <code>filter-samples</code> only drops samples and never subsamples, so both cutoffs give the same table. My intuition applies to rarefaction depth, which comes later. Claude should have explained that distinction up front.</div></li>
+          <li><i class="chip a">A</i><div><strong>The rare-ASV filter reconciled the two pipelines.</strong> It removed 92% of ASVs (8,227 → 661) but only 0.45% of reads. That's in line with DADA2's 1,066.</div></li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="step">
+      <div class="rail"><div class="num">9</div><div class="name">SEPP tree</div><div class="reads">660/660 ASVs placed</div></div>
+      <div class="body">
+        <pre class="term"><span class="dim">monitor ›</span> status: avail=121GB mine=0.5GB sepp_running=2
+<span class="dim">monitor ›</span> <span class="warn">status: avail=70GB mine=144.7GB sepp_running=105</span>
+<span class="dim">$</span> ps ... <span class="bad">running pplacer 48   load average 40.8   (asked for --p-threads 12)</span>
+<span class="dim">$</span> taskset -a -cp 36-47 &lt;each SEPP pid&gt;   <span class="ok">pinned 106 processes → ~10 cores</span></pre>
+        <ul class="finds">
+          <li><i class="chip a">A</i><div><strong>Caught a tool ignoring its thread limit, and fixed it live.</strong> The memory watch showed 105 processes, so Claude looked closer. Without killing the job, it pinned every process to 12 cores. SEPP finished in 28 min.</div></li>
+        </ul>
+        <div class="prompt"><span class="who">PROMPT</span><q>any idea why pplacer used so many threads? Has that bug (or behaviour) been seen elsewhere?</q></div>
+        <ul class="finds">
+          <li><i class="chip a">A</i><div><strong>Traced it to a single commit.</strong> In SEPP 4.5.6, <code>-x</code> is stored in <code>scheduler.default_cpus</code> but never read, so the job pool uses <code>cpu_count()</code>, which is 48 on kronos. Using the GitHub API, Claude found commit <a href="https://github.com/smirarab/sepp/commit/f50193014651cdbdfcfeb4a4affa434bbbef02e5">f501930</a> (2025-07-14, “remove unused variable default_cpus”), which deleted the line that used it. It found no existing issue. That took about 5 tool calls from symptom to commit.</div></li>
+        </ul>
+      </div>
+    </article>
+
+    <article class="step">
+      <div class="rail"><div class="num">10</div><div class="name">Export</div><div class="reads">660 ASVs × 89 samples</div></div>
+      <div class="body">
+        <ul class="finds">
+          <li><i class="chip a">A</i><div><strong>Found a gap in the SOP.</strong> Section 6 runs <code>sed</code> on <code>taxa/taxonomy.tsv</code>, but no earlier step creates it. Claude added the missing <code>qiime tools export</code>.</div></li>
+        </ul>
+      </div>
+    </article>
+
+  </div>
+</section>
+
+<section aria-labelledby="h-score">
+  <div class="section-head">
+    <div class="eyebrow">Scorecard</div>
+    <h2 id="h-score">Strengths and weaknesses</h2>
+  </div>
+  <div class="score">
+    <div>
+      <h3>Where it was strong</h3>
+      <ul>
+        <li>Reading raw evidence (FastQC tables, cutadapt reports, source code) and connecting it to a cause.</li>
+        <li>Checking its own work: parsing every report, cross-checking against the original analysis.</li>
+        <li>Cheap tests before expensive runs: the 4-sample merge sweep, test-loading the classifier.</li>
+        <li>Fixing its environment without being asked (MultiQC), and staying out of system files.</li>
+        <li>Root-causing problems in tools, not just working around them (SEPP).</li>
+      </ul>
+    </div>
+    <div class="weak">
+      <h3>Where it slipped</h3>
+      <ul>
+        <li>Confident claims before checking: no controls, “mock community”, a classifier download that doesn't exist.</li>
+        <li>Knowledge that's out of date for fast-moving tools (QIIME 2 2026.4 changes).</li>
+        <li>Shell habits that need a safety net: an unguarded <code>rm -rf</code>, a guessed file name.</li>
+        <li>Too many threads before I set the rule. Rules for a shared server need to be stated up front.</li>
+        <li>Runtime estimates were poor (Deblur: 1–2 h predicted, 20 min actual).</li>
+      </ul>
+    </div>
+  </div>
+  <p>The pattern: it's fast and thorough with evidence in front of it, and weakest when it relies on memory. Asking “how do you know?” and “why?” paid off every time.</p>
+</section>
+
+<section aria-labelledby="h-wiki">
+  <div class="section-head">
+    <div class="eyebrow">For the MH2 maintainers</div>
+    <h2 id="h-wiki">SOP updates this run turned up</h2>
+    <p>These came out of one pass through the wiki on QIIME 2 2026.4. All are written up with commands in <code>WORKFLOW_LOG.md</code>.</p>
+  </div>
+  <div class="fixes">
+    <div class="fix"><span class="where">Denoising summary</span><div><strong><code>feature-table summarize</code> changed.</strong> Use <code>--o-summary</code> plus the required <code>--o-feature-frequencies</code> and <code>--o-sample-frequencies</code>.</div></div>
+    <div class="fix"><span class="where">Taxonomy</span><div><strong>The shared classifiers won't load in 2026.4</strong> (they were built with scikit-learn 1.4.2, and 2026.4 has 1.7.1). QIIME 2 now points to SILVA (144, with a V4-515f-806r build) and GTDB on Zenodo. Greengenes2 would need training in-house.</div></div>
+    <div class="fix"><span class="where">SEPP</span><div><strong><code>--p-threads</code> is ignored in SEPP 4.5.6.</strong> Wrap the command: <code>taskset -c 0-11 nice -n 19 qiime fragment-insertion sepp ...</code>. An upstream issue or PR could restore the two deleted lines.</div></div>
+    <div class="fix"><span class="where">Export</span><div><strong>Add</strong> <code>qiime tools export --input-path taxa/classification.qza --output-path taxa</code> before the <code>sed</code> step.</div></div>
+    <div class="fix"><span class="where">Primer trimming</span><div><strong>Consider <code>--p-match-read-wildcards</code></strong> by default, and reverse-complement 3′ adapters for 2×300 V4 runs, where reads run through the opposite primer.</div></div>
+    <div class="fix"><span class="where">Read merging</span><div><strong>With read-through, use <code>--p-allowmergestagger</code></strong>, and test <code>maxdiffs</code> on a few samples first.</div></div>
+  </div>
+</section>
+
+<section aria-labelledby="h-cost">
+  <div class="section-head">
+    <div class="eyebrow">What it cost</div>
+    <h2 id="h-cost">Tokens and dollars</h2>
+    <p>I ran this on a personal Pro plan, which is a flat monthly fee with usage limits. To get a real number, Claude added up the token counts in the session's own transcript and priced them at <a href="https://platform.claude.com/docs/en/about-claude/pricing">Anthropic's API rates</a>, which is roughly what a team using API billing would pay.</p>
+  </div>
+  <div class="cost-big">
+    <div class="fact"><b>21.6 M</b><span>tokens processed over 184 model requests (Oct 19 14:12 – Oct 20 14:34)</span></div>
+    <div class="fact"><b>$10.63</b><span>at Claude Opus 5.5 API rates (the model used)</span></div>
+    <div class="fact"><b>$5.32</b><span>for the same tokens on Claude Sonnet 5.5: half the cost</span></div>
+  </div>
+  <figure class="chart-wrap" style="margin:0">
+    <svg id="costchart" viewBox="0 0 760 150" role="img" aria-label="Stacked bars comparing Opus 5.5 and Sonnet 5.5 cost by token type"></svg>
+    <figcaption class="chart-key"><span><i style="background:var(--base-c)"></i>Cache reads</span><span><i style="background:var(--base-g)"></i>Cache writes (1 h)</span><span><i style="background:var(--base-t)"></i>Output</span></figcaption>
+  </figure>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Token type</th><th class="n">Tokens</th><th class="n">Opus 5.5 rate</th><th class="n">Opus 5.5</th><th class="n">Sonnet 5.5 rate</th><th class="n">Sonnet 5.5</th></tr></thead>
+      <tbody>
+        <tr><td>Cache reads: the conversation re-sent with each request</td><td class="n">20,947,840</td><td class="n">$0.20 /M</td><td class="n">$4.19</td><td class="n">$0.10 /M</td><td class="n">$2.09</td></tr>
+        <tr><td>Cache writes: new content stored for 1 hour</td><td class="n">498,418</td><td class="n">$8 /M</td><td class="n">$3.99</td><td class="n">$4 /M</td><td class="n">$1.99</td></tr>
+        <tr><td>Output: Claude's replies, commands and scripts</td><td class="n">122,807</td><td class="n">$20 /M</td><td class="n">$2.46</td><td class="n">$10 /M</td><td class="n">$1.23</td></tr>
+        <tr><td>Uncached input</td><td class="n">396</td><td class="n">$4 /M</td><td class="n">&lt;$0.01</td><td class="n">$2 /M</td><td class="n">&lt;$0.01</td></tr>
+        <tr class="total"><td>Total</td><td class="n">21,569,461</td><td class="n"></td><td class="n">$10.63</td><td class="n"></td><td class="n">$5.32</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="cols">
+    <div>
+      <h3>How to read it</h3>
+      <ul class="plain">
+        <li>Each request re-sends the whole conversation, but mostly from a cache at 5% of the normal price. That's why 21 M tokens read cost less than 0.5 M written.</li>
+        <li>Claude's own output is under 1% of the tokens but about a quarter of the cost.</li>
+        <li>The pipeline compute ran on kronos and costs nothing here. A 28-minute SEPP run is one cheap request plus a notification when it finishes.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Sonnet instead of Opus?</h3>
+      <ul class="plain">
+        <li>Sonnet 5.5 costs exactly half per token in every category, so the same session would be about <strong>$5.32, saving $5.31</strong>.</li>
+        <li>That assumes the same tokens. A different model may take more or fewer turns, and the judgment-heavy moments (the N-artifact diagnosis, tracing the SEPP bug) are where models differ most.</li>
+        <li>A reasonable split: Sonnet for routine steps, Opus when something doesn't add up.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="cols">
+    <div>
+      <h3>“new task? /clear to save 124.5k tokens”</h3>
+      <p>The terminal shows this because the conversation is about 124.5k tokens long, and every new request re-reads all of it. That's about $0.025 per request on Opus, or $0.012 on Sonnet. <code>/clear</code> starts fresh at almost zero. Because the log, the notes and the memory files are saved on disk, a new session can pick the project back up. <code>/compact</code> is the middle option: it summarizes the conversation and carries on.</p>
+    </div>
+    <div>
+      <h3>Not counted</h3>
+      <p class="note">Web-page reads (WebFetch) use a separate small model, and the one automatic compaction probably isn't in the transcript totals, so the real figure is slightly higher. Building this page added more tokens after the totals were taken. On the Pro plan none of this is billed per token; it counts toward the plan's usage limits, which <code>/usage</code> shows.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <span>Data: IMMSA Homogeneity, 16S V4. Pipeline: Microbiome Helper 2 marker-gene SOP on QIIME 2 2026.4 (rachis), run on kronos with nice -n 19 and 12 threads.</span>
+  <span>Full record: <code>mh2_homogeneity/WORKFLOW_LOG.md</code> · Highlights: <code>PRESENTATION_NOTES.md</code> · Prompts are quoted verbatim from the session transcript; […] marks cuts.</span>
+</footer>
+
+</div>
+
+<script>
+(function () {
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs, text) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; return e; };
+
+  // Read funnel: millions of reads, summed over samples.
+  function funnel() {
+    const svg = document.getElementById("funnel"); svg.replaceChildren();
+    const rows = [
+      ["Raw read pairs", 20.74, 20.74],
+      ["After primer trimming", 19.94, 11.60],
+      ["After merging", 16.51, 10.81],
+      ["After denoising", 11.59, 10.70, "Deblur vs DADA2 non-chimeric"]
+    ];
+    const x0 = 190, x1 = 690, max = 22, sx = v => x0 + (v / max) * (x1 - x0);
+    const top = 16, rowH = 72, barH = 22;
+    for (let t = 0; t <= 20; t += 5) {
+      svg.append(el("line", { x1: sx(t), x2: sx(t), y1: top - 6, y2: top + rows.length * rowH, class: "grid" }));
+      svg.append(el("text", { x: sx(t), y: top + rows.length * rowH + 18, "text-anchor": "middle", class: "tick" }, t + " M"));
+    }
+    rows.forEach((r, i) => {
+      const y = top + i * rowH + 4;
+      svg.append(el("text", { x: 0, y: y + 18, "font-size": 14, "font-weight": 700 }, r[0]));
+      if (r[3]) svg.append(el("text", { x: 0, y: y + 36, "font-size": 11, fill: css("--muted"), style: "fill:var(--muted)" }, r[3]));
+      [[r[1], "--prompt", 0], [r[2], "--bar-orig", barH + 4]].forEach(([v, c, dy]) => {
+        svg.append(el("rect", { x: x0, y: y + dy, width: sx(v) - x0, height: barH, rx: 2, fill: css(c) }));
+        svg.append(el("text", { x: sx(v) + 6, y: y + dy + 16, "font-size": 12, class: "val" }, v.toFixed(2) + " M"));
+      });
+    });
+  }
+
+  // Cost: stacked bars, dollars.
+  function cost() {
+    const svg = document.getElementById("costchart"); svg.replaceChildren();
+    const rows = [["Opus 5.5", [4.19, 3.99, 2.46], "$10.63"], ["Sonnet 5.5", [2.09, 1.99, 1.23], "$5.32"]];
+    const cols = ["--base-c", "--base-g", "--base-t"];
+    const x0 = 110, x1 = 690, max = 12, sx = v => x0 + (v / max) * (x1 - x0);
+    const top = 12, rowH = 54, barH = 30;
+    for (let t = 0; t <= 12; t += 2) {
+      svg.append(el("line", { x1: sx(t), x2: sx(t), y1: top - 4, y2: top + rows.length * rowH, class: "grid" }));
+      svg.append(el("text", { x: sx(t), y: top + rows.length * rowH + 18, "text-anchor": "middle", class: "tick" }, "$" + t));
+    }
+    rows.forEach((r, i) => {
+      const y = top + i * rowH + 6; let acc = 0;
+      svg.append(el("text", { x: 0, y: y + 20, "font-size": 14, "font-weight": 700 }, r[0]));
+      r[1].forEach((v, j) => {
+        svg.append(el("rect", { x: sx(acc), y, width: sx(acc + v) - sx(acc), height: barH, fill: css(cols[j]) }));
+        acc += v;
+      });
+      svg.append(el("text", { x: sx(acc) + 8, y: y + 20, "font-size": 14, "font-weight": 700, class: "val" }, r[2]));
+    });
+  }
+
+  // 806R primer as a four-colour trace.
+  function trace() {
+    const cv = document.getElementById("trace"); const dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth, h = cv.clientHeight; cv.width = w * dpr; cv.height = h * dpr;
+    const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+    const seq = "GGACTACNVGGGTWTCTAAT";
+    const iupac = { A: "A", C: "C", G: "G", T: "T", N: "ACGT", V: "ACG", W: "AT" };
+    const bases = ["A", "C", "G", "T"], col = { A: css("--base-a"), C: css("--base-c"), G: css("--base-g"), T: css("--base-t") };
+    const labelH = 26, base = h - labelH, step = w / seq.length, sig = step * 0.2;
+    ctx.fillStyle = css("--prompt-bg");
+    ctx.fillRect(2 * step, 0, 5 * step, base);
+    ctx.fillStyle = css("--muted"); ctx.font = "11px " + css("--font-mono");
+    ctx.textAlign = "left"; ctx.fillText("R2 cycles 3–7: heavy N calls", 2 * step + 6, 14);
+    bases.forEach(b => {
+      ctx.beginPath(); ctx.strokeStyle = col[b]; ctx.lineWidth = 2;
+      for (let px = 0; px <= w; px += 1.5) {
+        let y = 0;
+        for (let i = 0; i < seq.length; i++) {
+          const opts = iupac[seq[i]]; if (!opts.includes(b)) continue;
+          const amp = (seq[i] === "N" ? 0.22 : 1 / opts.length) * (0.82 + 0.18 * Math.sin(i * 2.3 + b.charCodeAt(0)));
+          const d = px - (i + 0.5) * step; y += amp * Math.exp(-(d * d) / (2 * sig * sig));
+        }
+        const yy = base - 6 - y * (base - 26);
+        px === 0 ? ctx.moveTo(px, yy) : ctx.lineTo(px, yy);
+      }
+      ctx.stroke();
+    });
+    ctx.textAlign = "center"; ctx.font = "600 13px " + css("--font-mono");
+    for (let i = 0; i < seq.length; i++) {
+      const s = seq[i]; ctx.fillStyle = col[s] || css("--ink");
+      ctx.fillText(s, (i + 0.5) * step, h - 7);
+    }
+  }
+
+  function draw() { funnel(); cost(); trace(); }
+  const go = () => (document.fonts && document.fonts.ready ? document.fonts.ready.then(draw) : draw());
+  go();
+  window.addEventListener("resize", trace);
+  try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw); } catch (e) {}
+  new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+})();
+</script>
+</body>
+</html>
